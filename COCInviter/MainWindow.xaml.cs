@@ -23,403 +23,477 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Collections.Specialized;
 using System.Security.Cryptography;
+using Discord.WebSocket;
+using Discord;
 
 namespace COCInviter
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
-    public partial class MainWindow : Window
+  /// <summary>
+  /// Interaction logic for MainWindow.xaml
+  /// </summary>
+  public partial class MainWindow : Window
+  {
+    [DllImport("user32.dll")]
+    private static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll")]
+    private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, int dwExtraInfo);
+
+    private const uint MOUSEEVENTF_LEFTDOWN = 0x02;
+    private const uint MOUSEEVENTF_LEFTUP = 0x04;
+
+    [DllImport("user32.dll")]
+    public static extern short GetAsyncKeyState(int vKey);
+
+    private int maxLeague;
+    private List<string> acceptedRoles = new List<string>();
+    private int minTh;
+    private int minLevel;
+    private int minAttacks;
+    private int minKing;
+    private int minQueen;
+    private int minWarden;
+    private int minChampion;
+    private int minTrophies;
+    private int minDonations;
+
+    private ObservableCollection<Player> players
     {
-      [DllImport("user32.dll")]
-      private static extern bool SetCursorPos(int x, int y);
-
-      [DllImport("user32.dll")]
-      private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, int dwExtraInfo);
-
-      private const uint MOUSEEVENTF_LEFTDOWN = 0x02;
-      private const uint MOUSEEVENTF_LEFTUP = 0x04;
-
-      [DllImport("user32.dll")]
-      public static extern short GetAsyncKeyState(int vKey);
-
-      private int maxLeague;
-      private List<string> acceptedRoles = new List<string>();
-      private int minTh;
-      private int minLevel;
-      private int minAttacks;
-      private int minKing;
-      private int minQueen;
-      private int minWarden;
-      private int minChampion;
-      private int minTrophies;
-      private int minDonations;
-
-      private ObservableCollection<Player> players { get; } = new ObservableCollection<Player>();
-      private StringCollection uniquePlayers = new StringCollection();
-      // Stats
-      private int sessionPlayersFound = 0;
-      private int sessionPlayersInvited = 0;
-      // Total
-      private int totalPlayersFound = 0;
-      private int totalPlayersInvited = 0;
-
-      private string API_TOKEN = "";
-       
-      public MainWindow()
+      get
       {
-        Closing += ApplicationClosing;
-
-        InitializeComponent();
-
-        PlayerTable.ItemsSource = players;
-
-        LoadSettings();
-
-        PlayersToInviteText.Content = "Players to invite: " + players.Count;
-        EstimatedTimeLeftText.Content = "Estimated time left: " + (int)Math.Floor(players.Count * 2.9 / 60) + "m " + (int)Math.Floor((players.Count * 2.9) % 60) + "s";
-
-      Thread keybindListenerThread = new Thread(KeybindListener)
+        lock (playerListLock)
         {
-          IsBackground = true
-        };
-        keybindListenerThread.Start();
+          return _players;
+        }
       }
-
-      private void ApplicationClosing(object sender, System.ComponentModel.CancelEventArgs e)
+      set
       {
-        Properties.Settings.Default.totalPlayersFoundSetting = totalPlayersFound;
-        Properties.Settings.Default.totalPlayersInvitedSetting = totalPlayersInvited;
-        string serializedPlayers = JsonConvert.SerializeObject(players);
-        Properties.Settings.Default.savedPlayersSetting = serializedPlayers;
-        Properties.Settings.Default.uniquePlayersSetting = uniquePlayers;
-
-        Properties.Settings.Default.Save();
+        lock (playerListLock)
+        {
+          _players = value;
+        }
+      }
     }
 
-      public void KeybindListener()
-        {
-          while (true)
-          {
-            // Minimum CPU usage
-            Thread.Sleep(150);
-            // Loop through all possible keys
-            for (int i = 120; i < 130; i++)
-            {
-              int keyState = GetAsyncKeyState(i);
+    private readonly object playerListLock = new object();
+    private ObservableCollection<Player> _players = new ObservableCollection<Player>();
 
-              // Check if a set keybind is being pressed, trigger event if detected
-              if (keyState != 0)
+    private StringCollection uniquePlayers = new StringCollection();
+
+    // Stats
+    private int sessionPlayersFound = 0;
+    private int sessionPlayersInvited = 0;
+    // Total
+    private int totalPlayersFound = 0;
+    private int totalPlayersInvited = 0;
+
+    private string API_TOKEN = "";
+
+    public MainWindow()
+    {
+      Closing += ApplicationClosing;
+
+      InitializeComponent();
+
+      PlayerTable.ItemsSource = players;
+
+      LoadSettings();
+
+      PlayersToInviteText.Content = "Players to invite: " + players.Count;
+      EstimatedTimeLeftText.Content = "Estimated time left: " + (int)Math.Floor(players.Count * 2.9 / 60) + "m " + (int)Math.Floor((players.Count * 2.9) % 60) + "s";
+
+      Thread keybindListenerThread = new Thread(KeybindListener)
+      {
+        IsBackground = true
+      };
+      keybindListenerThread.Start();
+
+      Thread discordBot = new Thread(InitializeDiscordBot) { IsBackground = true };
+      discordBot.Start();
+      _ = StartMethodLoop();
+    }
+
+    async Task StartMethodLoop()
+    {
+      while (true)
+      {
+        // Call your method here
+        Dispatcher.Invoke(() =>
+        {
+          UpdateDiscordPresence(totalPlayersInvited);
+        });
+        // Wait for 30 seconds
+        await Task.Delay(TimeSpan.FromSeconds(30));
+      }
+    }
+
+    private static DiscordSocketClient _client;
+
+    // Function to initialize the Discord bot
+    private static void InitializeDiscordBot()
+    {
+      _client = new DiscordSocketClient();
+
+      _client.Log += LogAsync;
+      _client.Ready += ReadyAsync;
+
+      _client.LoginAsync(TokenType.Bot, "MTA5Mzg2MTQyNjc0NzE1NDQ3Mw.GY6Mcv.omb9vyPsITXK4-9rRvER2H9EihnIkrXNptnTcI");
+      _client.StartAsync();
+
+      Task.Delay(-1).GetAwaiter().GetResult();
+    }
+
+    private static async Task ReadyAsync()
+    {
+      Console.WriteLine($"{_client.CurrentUser.Username} is connected!");
+    }
+
+    private static async Task LogAsync(LogMessage log)
+    {
+      Console.WriteLine(log.Message);
+    }
+
+    // Function to update the playing status with number of players invited
+    private static async void UpdateDiscordPresence(int numberOfPlayersInvited)
+    {
+      if (_client != null)
+        await _client.SetGameAsync($"Invited {numberOfPlayersInvited} players!", type: ActivityType.Playing);
+    }
+
+    private void ApplicationClosing(object sender, System.ComponentModel.CancelEventArgs e)
+    {
+      Properties.Settings.Default.totalPlayersFoundSetting = totalPlayersFound;
+      Properties.Settings.Default.totalPlayersInvitedSetting = totalPlayersInvited;
+      string serializedPlayers = JsonConvert.SerializeObject(players);
+      Properties.Settings.Default.savedPlayersSetting = serializedPlayers;
+      Properties.Settings.Default.uniquePlayersSetting = uniquePlayers;
+
+      Properties.Settings.Default.Save();
+    }
+
+    public void KeybindListener()
+    {
+      while (true)
+      {
+        // Minimum CPU usage
+        Thread.Sleep(150);
+        // Loop through all possible keys
+        for (int i = 120; i < 130; i++)
+        {
+          int keyState = GetAsyncKeyState(i);
+
+          // Check if a set keybind is being pressed, trigger event if detected
+          if (keyState != 0)
+          {
+            if (Enum.GetName(typeof(Keys), i) == "F9")
+            {
+              Dispatcher.Invoke(() =>
               {
-                if (Enum.GetName(typeof(Keys), i) == "F9")
-                {
-                  Dispatcher.Invoke(() =>
-                  {
-                    if (FindPlayersCheckBox.IsChecked is true) FindPlayersCheckBox.IsChecked = false;
-                    else if (!FindPlayersCheckBox.IsChecked is true) FindPlayersCheckBox.IsChecked = true;
-                  });
-                }
-                if (Enum.GetName(typeof(Keys), i) == "F10")
-                {
-                  Dispatcher.Invoke(() =>
-                  {
-                    if (InvitePlayersCheckBox.IsChecked is true) InvitePlayersCheckBox.IsChecked = false;
-                    else if (!InvitePlayersCheckBox.IsChecked is true) InvitePlayersCheckBox.IsChecked = true;
-                  });
-                }
-              }
+                if (FindPlayersCheckBox.IsChecked is true) FindPlayersCheckBox.IsChecked = false;
+                else if (!FindPlayersCheckBox.IsChecked is true) FindPlayersCheckBox.IsChecked = true;
+              });
+            }
+            if (Enum.GetName(typeof(Keys), i) == "F10")
+            {
+              Dispatcher.Invoke(() =>
+              {
+                if (InvitePlayersCheckBox.IsChecked is true) InvitePlayersCheckBox.IsChecked = false;
+                else if (!InvitePlayersCheckBox.IsChecked is true) InvitePlayersCheckBox.IsChecked = true;
+              });
             }
           }
         }
+      }
+    }
 
 
-      public async void FindPlayersAsync()
-      {
+    public async void FindPlayersAsync()
+    {
       string lastFirstClan = "";
-        bool isChecked = true;
-        while (isChecked)
+      bool isChecked = true;
+      while (isChecked)
+      {
+        using (HttpClient httpClient = new HttpClient())
         {
-          using (HttpClient httpClient = new HttpClient())
+          try
           {
-            try
+            // API endpoint with query parameters
+            UriBuilder apiUrl = new UriBuilder("https://api.clashofclans.com/v1/clans?");
+            apiUrl.Query = "locationId=32000094&limit=1000"; // Add query parameters here
+
+            httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + API_TOKEN);
+
+            // Send GET request with parameters
+            HttpResponseMessage response = await httpClient.GetAsync(apiUrl.Uri);
+
+            if (response.IsSuccessStatusCode)
             {
-              // API endpoint with query parameters
-              UriBuilder apiUrl = new UriBuilder("https://api.clashofclans.com/v1/clans?");
-              apiUrl.Query = "locationId=32000094&limit=1000"; // Add query parameters here
+              // Read the JSON response as a string
+              string jsonResponse = await response.Content.ReadAsStringAsync();
 
-              httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
-              httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + API_TOKEN);
+              // Parse the JSON response as a JObject
+              dynamic jsonObject = JsonConvert.DeserializeObject<dynamic>(jsonResponse);
 
-              // Send GET request with parameters
-              HttpResponseMessage response = await httpClient.GetAsync(apiUrl.Uri);
-
-              if (response.IsSuccessStatusCode)
+              // Access the list of objects (clans in this case) and iterate through them
+              if (jsonObject.items[0].tag != lastFirstClan)
               {
-                // Read the JSON response as a string
-                string jsonResponse = await response.Content.ReadAsStringAsync();
-
-                // Parse the JSON response as a JObject
-                dynamic jsonObject = JsonConvert.DeserializeObject<dynamic>(jsonResponse);
-
-                // Access the list of objects (clans in this case) and iterate through them
-                if (jsonObject.items[0].tag != lastFirstClan)
+                lastFirstClan = jsonObject.items[0].tag;
+                foreach (dynamic clan in jsonObject.items)
                 {
-                  lastFirstClan = jsonObject.items[0].tag;
-                  foreach (dynamic clan in jsonObject.items)
+                  Dispatcher.Invoke(() =>
                   {
-                    Dispatcher.Invoke(() =>
-                    {
-                      isChecked = FindPlayersCheckBox.IsChecked is true;
-                    });
-                    if (!isChecked) return;
-                    string language = "";
-                    int league = 0;
-                    string clanTag = clan.tag;
+                    isChecked = FindPlayersCheckBox.IsChecked is true;
+                  });
+                  if (!isChecked) return;
+                  string language = "";
+                  int league = 0;
+                  string clanTag = clan.tag;
 
+                  try
+                  {
+                    language = clan.chatLanguage.name;
+
+                    if (language != "Deutsch") continue;
+                  }
+                  catch { }
+
+                  try
+                  {
+                    league = clan.warLeague.id;
+                    if (league > maxLeague) continue;
+                  }
+                  catch { }
+
+                  using (HttpClient httpClient2 = new HttpClient())
+                  {
                     try
                     {
-                      language = clan.chatLanguage.name;
+                      // API endpoint with query parameters
+                      UriBuilder apiUrl2 = new UriBuilder($"https://api.clashofclans.com/v1/clans/%23{clanTag.Replace("#", "")}/members");
 
-                      if (language != "Deutsch") continue;
-                    }
-                    catch { }
+                      httpClient2.DefaultRequestHeaders.Add("Accept", "application/json");
+                      httpClient2.DefaultRequestHeaders.Add("Authorization", "Bearer " + API_TOKEN);
 
-                    try
-                    {
-                      league = clan.warLeague.id;
-                      if (league > maxLeague) continue;
-                    }
-                    catch { }
+                      // Send GET request with parameters
+                      HttpResponseMessage response2 = await httpClient2.GetAsync(apiUrl2.Uri);
 
-                    using (HttpClient httpClient2 = new HttpClient())
-                    {
-                      try
+                      if (response2.IsSuccessStatusCode)
                       {
-                        // API endpoint with query parameters
-                        UriBuilder apiUrl2 = new UriBuilder($"https://api.clashofclans.com/v1/clans/%23{clanTag.Replace("#", "")}/members");
+                        // Read the JSON response as a string
+                        string jsonResponse2 = await response2.Content.ReadAsStringAsync();
 
-                        httpClient2.DefaultRequestHeaders.Add("Accept", "application/json");
-                        httpClient2.DefaultRequestHeaders.Add("Authorization", "Bearer " + API_TOKEN);
+                        // Parse the JSON response as a JObject
+                        dynamic jsonObject2 = JsonConvert.DeserializeObject<dynamic>(jsonResponse2);
 
-                        // Send GET request with parameters
-                        HttpResponseMessage response2 = await httpClient2.GetAsync(apiUrl2.Uri);
-
-                        if (response2.IsSuccessStatusCode)
+                        // Access the list of objects (clans in this case) and iterate through them
+                        foreach (dynamic member in jsonObject2.items)
                         {
-                          // Read the JSON response as a string
-                          string jsonResponse2 = await response2.Content.ReadAsStringAsync();
+                          if (!isChecked) return;
+                          int level = member["expLevel"];
+                          string memberTag = member["tag"];
+                          if (uniquePlayers.Contains(memberTag)) continue;
+                          string role = member["role"];
+                          if (!acceptedRoles.Contains(role.ToLower())) continue;
 
-                          // Parse the JSON response as a JObject
-                          dynamic jsonObject2 = JsonConvert.DeserializeObject<dynamic>(jsonResponse2);
+                          if (level < minLevel) continue;
 
-                          // Access the list of objects (clans in this case) and iterate through them
-                          foreach (dynamic member in jsonObject2.items)
+                          using (HttpClient httpClient3 = new HttpClient())
                           {
-                            if (!isChecked) return;
-                            int level = member["expLevel"];
-                            string memberTag = member["tag"];
-                            if (uniquePlayers.Contains(memberTag)) continue;
-                            string role = member["role"];
-                            if (!acceptedRoles.Contains(role.ToLower())) continue;
-
-                            if (level < minLevel) continue;
-
-                            using (HttpClient httpClient3 = new HttpClient())
+                            try
                             {
-                              try
+                              // API endpoint with query parameters
+                              UriBuilder apiUrl3 = new UriBuilder($"https://api.clashofclans.com/v1/players/%23{memberTag.Replace("#", "")}");
+
+                              httpClient3.DefaultRequestHeaders.Add("Accept", "application/json");
+                              httpClient3.DefaultRequestHeaders.Add("Authorization", "Bearer " + API_TOKEN);
+
+                              // Send GET request with parameters
+                              HttpResponseMessage response3 = await httpClient3.GetAsync(apiUrl3.Uri);
+
+                              if (response3.IsSuccessStatusCode)
                               {
-                                // API endpoint with query parameters
-                                UriBuilder apiUrl3 = new UriBuilder($"https://api.clashofclans.com/v1/players/%23{memberTag.Replace("#", "")}");
+                                // Read the JSON response as a string
+                                string jsonResponse3 = await response3.Content.ReadAsStringAsync();
 
-                                httpClient3.DefaultRequestHeaders.Add("Accept", "application/json");
-                                httpClient3.DefaultRequestHeaders.Add("Authorization", "Bearer " + API_TOKEN);
+                                // Parse the JSON response as a JObject
+                                dynamic player = JsonConvert.DeserializeObject<dynamic>(jsonResponse3);
 
-                                // Send GET request with parameters
-                                HttpResponseMessage response3 = await httpClient3.GetAsync(apiUrl3.Uri);
+                                int thLevel = player.townHallLevel;
+                                if (thLevel < minTh) continue;
 
-                                if (response3.IsSuccessStatusCode)
+                                int attacks = player.attackWins;
+                                if (attacks < minAttacks) continue;
+
+                                int trophies = player.trophies;
+                                if (trophies < minTrophies) continue;
+
+                                int donations = player.achievements[14].value;
+                                if (donations < minDonations) continue;
+
+                                int king = 0;
+                                int queen = 0;
+                                int warden = 0;
+                                int champion = 0;
+                                try
                                 {
-                                  // Read the JSON response as a string
-                                  string jsonResponse3 = await response3.Content.ReadAsStringAsync();
-
-                                  // Parse the JSON response as a JObject
-                                  dynamic player = JsonConvert.DeserializeObject<dynamic>(jsonResponse3);
-
-                                  int thLevel = player.townHallLevel;
-                                  if (thLevel < minTh) continue;
-
-                                  int attacks = player.attackWins;
-                                  if (attacks < minAttacks) continue;
-
-                                  int trophies = player.trophies;
-                                  if (trophies < minTrophies) continue;
-
-                                  int donations = player.achievements[14].value;
-                                  if (donations < minDonations) continue;
-
-                                  int king = 0;
-                                  int queen = 0;
-                                  int warden = 0;
-                                  int champion = 0;
-                                  try
-                                  {
-                                    king = player.heroes[0].level;
-                                    queen = player.heroes[1].level;
-                                    warden = player.heroes[2].level;
-                                    champion = player.heroes[4].level;
-                                  }
-                                  catch { }
-
-                                  if (king < minKing || queen < minQueen || warden < minWarden || champion < minChampion) continue;
-
-                                  Dispatcher.Invoke(() =>
-                                  {
-                                    uniquePlayers.Add(memberTag);
-
-                                    players.Add(new Player { Tag = memberTag, Townhall = thLevel, Level = level, Queen = queen, King = king, Warden = warden, Champion = champion, Attacks = attacks, Trophies = trophies, Donations = donations });
-                                    sessionPlayersFound++;
-                                    SessionPlayersFoundText.Content = "Session players found: " + sessionPlayersFound;
-                                    PlayersToInviteText.Content = "Players to invite: " + players.Count;
-                                    EstimatedTimeLeftText.Content = "Estimated invite time: " + (int)Math.Floor(players.Count * 2.9 / 60) + "m " + (int)Math.Floor((players.Count * 2.9) % 60) + "s";
-                                    totalPlayersFound++;
-                                    TotalPlayersFoundText.Content = "Total players found: " + totalPlayersFound;
-                                    isChecked = FindPlayersCheckBox.IsChecked is true;
-                                  });
-                                  if (!isChecked) return;
+                                  king = player.heroes[0].level;
+                                  queen = player.heroes[1].level;
+                                  warden = player.heroes[2].level;
+                                  champion = player.heroes[4].level;
                                 }
+                                catch { }
+
+                                if (king < minKing || queen < minQueen || warden < minWarden || champion < minChampion) continue;
+
+                                Dispatcher.Invoke(() =>
+                                {
+                                  uniquePlayers.Add(memberTag);
+
+                                  players.Add(new Player { Tag = memberTag, Townhall = thLevel, Level = level, Queen = queen, King = king, Warden = warden, Champion = champion, Attacks = attacks, Trophies = trophies, Donations = donations });
+                                  sessionPlayersFound++;
+                                  SessionPlayersFoundText.Content = "Session players found: " + sessionPlayersFound;
+                                  PlayersToInviteText.Content = "Players to invite: " + players.Count;
+                                  EstimatedTimeLeftText.Content = "Estimated invite time: " + (int)Math.Floor(players.Count * 2.9 / 60) + "m " + (int)Math.Floor((players.Count * 2.9) % 60) + "s";
+                                  totalPlayersFound++;
+                                  TotalPlayersFoundText.Content = "Total players found: " + totalPlayersFound;
+                                  isChecked = FindPlayersCheckBox.IsChecked is true;
+                                });
+                                if (!isChecked) return;
                               }
-                              catch { }
                             }
+                            catch { }
                           }
                         }
                       }
-                      catch { }
                     }
-
+                    catch { }
                   }
+
                 }
               }
             }
-            catch { }
           }
+          catch { }
         }
       }
+    }
 
-      public void InvitePlayers()
+    public void InvitePlayers()
+    {
+      bool isChecked = true;
+      while (isChecked)
       {
-        bool isChecked = true;
-        while (isChecked)
+        if (players.Count == 0) continue;
+        Dispatcher.Invoke(() =>
         {
-          if (players.Count == 0) continue;
-          Dispatcher.Invoke(() =>
-          {
-            isChecked = InvitePlayersCheckBox.IsChecked is true;
-          });
-          if (!isChecked ) return;
+          isChecked = InvitePlayersCheckBox.IsChecked is true;
+        });
+        if (!isChecked) return;
 
-          Player p = players[0];
-          string tag = p.Tag.Replace("#", "");
+        Player p = players[0];
+        string tag = p.Tag.Replace("#", "");
 
-          SetCursorPos(700, 325);
-          mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
-          mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
-          Thread.Sleep(250);
-          for (int i = 0; i < 10; i++)
-            SendKeys.SendWait("{BACKSPACE}");
-          Thread.Sleep(250);
-          SendKeys.SendWait(tag);
-          Thread.Sleep(350);
-          SetCursorPos(1200, 325);
-          mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
-          mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0); 
-          Thread.Sleep(1500);
-          SetCursorPos(700, 550);
-          mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
-          mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
-          Thread.Sleep(300);
-          SetCursorPos(300, 125);
-          mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
-          mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
-          Thread.Sleep(250);
+        SetCursorPos(700, 325);
+        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+        Thread.Sleep(250);
+        for (int i = 0; i < 10; i++)
+          SendKeys.SendWait("{BACKSPACE}");
+        Thread.Sleep(250);
+        SendKeys.SendWait(tag);
+        Thread.Sleep(350);
+        SetCursorPos(1200, 325);
+        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+        Thread.Sleep(1500);
+        SetCursorPos(700, 550);
+        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+        Thread.Sleep(300);
+        SetCursorPos(300, 125);
+        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+        Thread.Sleep(250);
 
-          Dispatcher.Invoke(() =>
-          {
-            players.RemoveAt(0);
-            sessionPlayersInvited++;
-            SessionPlayersInvitedText.Content = "Session players invited: " + sessionPlayersInvited;
-            PlayersToInviteText.Content = "Players to invite: " + players.Count;
-            EstimatedTimeLeftText.Content = "Estimated invite time: " + (int)Math.Floor(players.Count * 2.9 / 60) + "m " + (int)Math.Floor((players.Count * 2.9) % 60) + "s";
-            totalPlayersInvited++;
-            TotalPlayersInvitedText.Content = "Total players invited: " + totalPlayersInvited;
-            isChecked = InvitePlayersCheckBox.IsChecked is true;
-          });
-          if (!isChecked) return;
-        }
+        Dispatcher.Invoke(() =>
+        {
+          players.RemoveAt(0);
+          sessionPlayersInvited++;
+          SessionPlayersInvitedText.Content = "Session players invited: " + sessionPlayersInvited;
+          PlayersToInviteText.Content = "Players to invite: " + players.Count;
+          EstimatedTimeLeftText.Content = "Estimated invite time: " + (int)Math.Floor(players.Count * 2.9 / 60) + "m " + (int)Math.Floor((players.Count * 2.9) % 60) + "s";
+          totalPlayersInvited++;
+          TotalPlayersInvitedText.Content = "Total players invited: " + totalPlayersInvited;
+          isChecked = InvitePlayersCheckBox.IsChecked is true;
+        });
+        if (!isChecked) return;
       }
+    }
 
 
-      private void FindPlayersCheckBox_Checked(object sender, RoutedEventArgs e)
+    private void FindPlayersCheckBox_Checked(object sender, RoutedEventArgs e)
+    {
+      if (!FindPlayersCheckBox.IsChecked is true) return;
+
+      if (MaxLeagueComboBox.SelectedIndex == -1 || MinTownhallTextBox.ToString() == null ||
+          MinLevelTextBox.ToString() == null || MinAttacksTextBox.ToString() == null
+          || MinKingTextBox.ToString() == null || MinQueenTextBox.ToString() == null || MinWardenTextBox.ToString() == null
+          || MinChampionTextBox.ToString() == null || MinTrophiesTextBox.ToString() == null || MinDonationsTextBox.ToString() == null || ApiKeyTextBox.ToString() == null)
       {
-        if (!FindPlayersCheckBox.IsChecked is true) return;
-
-        if (MaxLeagueComboBox.SelectedIndex == -1 || MinTownhallTextBox.ToString() == null ||
-            MinLevelTextBox.ToString() == null || MinAttacksTextBox.ToString() == null
-            || MinKingTextBox.ToString() == null || MinQueenTextBox.ToString() == null || MinWardenTextBox.ToString() == null
-            || MinChampionTextBox.ToString() == null || MinTrophiesTextBox.ToString() == null || MinDonationsTextBox.ToString() == null || ApiKeyTextBox.ToString() == null)
-        {
-          e.Handled = true;
-          FindPlayersCheckBox.IsChecked = false;
-          return;
-        }
-        GetSelectedRoles();
-        maxLeague = MaxLeagueComboBox.SelectedIndex + 48000001;
-        minTh = int.Parse(MinTownhallTextBox.Text);
-        minLevel = int.Parse(MinLevelTextBox.Text);
-        minAttacks = int.Parse(MinAttacksTextBox.Text);
-        minKing = int.Parse(MinKingTextBox.Text);
-        minQueen = int.Parse(MinQueenTextBox.Text);
-        minWarden = int.Parse(MinWardenTextBox.Text);
-        minChampion = int.Parse(MinChampionTextBox.Text);
-        minTrophies = int.Parse(MinTrophiesTextBox.Text);
-        minDonations = int.Parse(MinDonationsTextBox.Text);
-        API_TOKEN = ApiKeyTextBox.Text;
-
-        Thread findPlayersThread = new Thread(FindPlayersAsync)
-        {
-          IsBackground = true
-        };
-        findPlayersThread.Start();
+        e.Handled = true;
+        FindPlayersCheckBox.IsChecked = false;
+        return;
       }
+      GetSelectedRoles();
+      maxLeague = MaxLeagueComboBox.SelectedIndex + 48000001;
+      minTh = int.Parse(MinTownhallTextBox.Text);
+      minLevel = int.Parse(MinLevelTextBox.Text);
+      minAttacks = int.Parse(MinAttacksTextBox.Text);
+      minKing = int.Parse(MinKingTextBox.Text);
+      minQueen = int.Parse(MinQueenTextBox.Text);
+      minWarden = int.Parse(MinWardenTextBox.Text);
+      minChampion = int.Parse(MinChampionTextBox.Text);
+      minTrophies = int.Parse(MinTrophiesTextBox.Text);
+      minDonations = int.Parse(MinDonationsTextBox.Text);
+      API_TOKEN = ApiKeyTextBox.Text;
 
-      private void InvitePlayersCheckBox_Checked(object sender, RoutedEventArgs e)
+      Thread findPlayersThread = new Thread(FindPlayersAsync)
       {
-        if (!InvitePlayersCheckBox.IsChecked is true) return;
+        IsBackground = true
+      };
+      findPlayersThread.Start();
+    }
 
-        Thread invitePlayersThread = new Thread(InvitePlayers)
-        {
-          IsBackground = true
-        };
-        invitePlayersThread.Start();
-      }
+    private void InvitePlayersCheckBox_Checked(object sender, RoutedEventArgs e)
+    {
+      if (!InvitePlayersCheckBox.IsChecked is true) return;
 
-      private void TextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+      Thread invitePlayersThread = new Thread(InvitePlayers)
       {
-        if (!int.TryParse(e.Text, out _)) { e.Handled = true; return; }
-        if (sender is System.Windows.Controls.TextBox textBox)
-        {
-          Properties.Settings.Default[textBox.Name + "Setting"] = int.Parse(textBox.Text + e.Text);
-          Properties.Settings.Default.Save();
-        }
-      }
+        IsBackground = true
+      };
+      invitePlayersThread.Start();
+    }
 
-      private void GetSelectedRoles()
+    private void TextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+      if (!int.TryParse(e.Text, out _)) { e.Handled = true; return; }
+      if (sender is System.Windows.Controls.TextBox textBox)
       {
-        acceptedRoles.Clear();
-        foreach (var selectedItem in RolesBox.SelectedItems)
-        {
-          acceptedRoles.Add(((ListBoxItem)selectedItem).Content.ToString().ToLower());
-        }
+        Properties.Settings.Default[textBox.Name + "Setting"] = int.Parse(textBox.Text + e.Text);
+        Properties.Settings.Default.Save();
       }
+    }
+
+    private void GetSelectedRoles()
+    {
+      acceptedRoles.Clear();
+      foreach (var selectedItem in RolesBox.SelectedItems)
+      {
+        acceptedRoles.Add(((ListBoxItem)selectedItem).Content.ToString().ToLower());
+      }
+    }
 
     private void RolesBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -448,7 +522,8 @@ namespace COCInviter
 
     private void MaxLeagueComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-      if (sender is System.Windows.Controls.ComboBox comboBox) {
+      if (sender is System.Windows.Controls.ComboBox comboBox)
+      {
         Properties.Settings.Default.maxLeagueTextBoxSetting = comboBox.SelectedIndex;
         Properties.Settings.Default.Save();
       }

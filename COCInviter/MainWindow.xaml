@@ -10,11 +10,10 @@
         <TabItem Header="Players">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="74.276" />
-                    <ColumnDefinition Width="525.724"/>
-                    <ColumnDefinition Width="225" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Grid Grid.Column="0" Height="475" Width="600" VerticalAlignment="Top" HorizontalAlignment="Left" Grid.ColumnSpan="2">
+                <Grid Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Left">
                     <DataGrid x:Name="PlayerTable" AutoGenerateColumns="False" AlternatingRowBackground="Transparent"
                     HorizontalGridLinesBrush="Black" VerticalGridLinesBrush="Black" CanUserAddRows="False">
                         <DataGrid.Resources>
@@ -30,21 +29,21 @@
                             </Style>
                         </DataGrid.Resources>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="80" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Townhall" Binding="{Binding Townhall}" Width="60" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="50" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Queen" Binding="{Binding Queen}" Width="50" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="King" Binding="{Binding King}" Width="45" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Warden" Binding="{Binding Warden}" Width="55" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Champion" Binding="{Binding Champion}" Width="65" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Attacks" Binding="{Binding Attacks}" Width="50" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Trophies" Binding="{Binding Trophies}" Width="60" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Donations" Binding="{Binding Donations}" Width="80" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Townhall" Binding="{Binding Townhall}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Queen" Binding="{Binding Queen}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="King" Binding="{Binding King}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Warden" Binding="{Binding Warden}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Champion" Binding="{Binding Champion}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Attacks" Binding="{Binding Attacks}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Trophies" Binding="{Binding Trophies}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Donations" Binding="{Binding Donations}" Width="*" IsReadOnly="True"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
 
-                <Grid Grid.Column="2" Height="475" Width="225" HorizontalAlignment="Center" VerticalAlignment="Top" Background="WhiteSmoke">
+                <Grid Grid.Column="1" HorizontalAlignment="Left" Background="WhiteSmoke">
                     <Label Content="Invite Stats" HorizontalAlignment="Center" Margin="0,5,0,0" VerticalAlignment="Top" FontWeight="Bold" FontSize="20"/>
 
                     <Line X1="0" Y1="50" X2="225" Y2="50" Stroke="Black" StrokeThickness="2" />
