@@ -10,9 +10,9 @@ using System.Windows;
 [assembly: AssemblyTitle("COCInviter")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Vector group")]
+[assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("COCInviter")]
-[assembly: AssemblyCopyright("Copyright © Vector group 2023")]
+[assembly: AssemblyCopyright("")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
