@@ -1,12 +1,7 @@
 ﻿using Discord.WebSocket;
 using Discord;
-using Discord.Commands;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using System.Windows.Threading;
 using System.Reflection;
 using Discord.Interactions;
@@ -30,6 +25,11 @@ namespace COCInviter.Helpers
 
     public async void InitializeDiscordBot()
     {
+      _client = new DiscordSocketClient(new DiscordSocketConfig
+      {
+        GatewayIntents = GatewayIntents.AllUnprivileged
+      });
+
       _services = ConfigureServices();
 
       _client = _services.GetRequiredService<DiscordSocketClient>();
@@ -38,16 +38,57 @@ namespace COCInviter.Helpers
       _client.Log += LogAsync;
       _commands.Log += LogAsync;
 
-      Env.Load("../../../.env");
-      string botToken = Environment.GetEnvironmentVariable("BOT_TOKEN");
-
-      await _client.LoginAsync(TokenType.Bot, botToken);
-      await _client.StartAsync();
+      _client.Disconnected += OnDisconnectedAsync;
 
       await InstallCommandsAsync();
 
       Dispatcher dispatcher = _mainWindow.Dispatcher;
       _ = StartUpdateDiscordPresence(dispatcher);
+
+      await StartBotAsync();
+
+      // Keep the program running
+      await Task.Delay(-1);
+    }
+
+    private async Task StartBotAsync()
+    {
+      try
+      {
+        Env.Load("../../../.env");
+        string token = Environment.GetEnvironmentVariable("BOT_TOKEN");
+        await _client.LoginAsync(TokenType.Bot, token);
+        await _client.StartAsync();
+
+        Console.WriteLine("Bot is running.");
+      }
+      catch (Exception ex)
+      {
+        Console.WriteLine($"Error starting bot: {ex.Message}");
+      }
+    }
+
+    private async Task OnDisconnectedAsync(Exception ex)
+    {
+      Console.WriteLine($"Bot disconnected: {ex.Message}");
+
+      // Attempt reconnection
+      while (_client.ConnectionState != ConnectionState.Connected)
+      {
+        Console.WriteLine("Attempting to reconnect...");
+        try
+        {
+          await _client.StopAsync();
+          await Task.Delay(5000); // Wait for 5 seconds before retrying
+          await StartBotAsync();
+        }
+        catch (Exception reconnectEx)
+        {
+          Console.WriteLine($"Reconnection failed: {reconnectEx.Message}");
+        }
+      }
+
+      Console.WriteLine("Reconnected successfully.");
     }
 
     private async Task InstallCommandsAsync()

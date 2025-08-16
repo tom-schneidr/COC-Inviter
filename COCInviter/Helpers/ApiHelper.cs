@@ -45,21 +45,28 @@ namespace COCInviter.Helpers
 
     public async Task<List<dynamic>> GetListOfClansAsync()
     {
-      using (HttpClient httpClient = CreateHttpClient())
+      try
       {
-        UriBuilder uriBuilder = new UriBuilder("https://api.clashofclans.com/v1/clans?");
-        uriBuilder.Query = "locationId=32000094&limit=1000";
-
-        HttpResponseMessage response = await httpClient.GetAsync(uriBuilder.Uri);
-        if (response.IsSuccessStatusCode)
+        using (HttpClient httpClient = CreateHttpClient())
         {
-          string jsonResponse = await response.Content.ReadAsStringAsync();
-          dynamic jsonObject = JsonConvert.DeserializeObject<dynamic>(jsonResponse);
-          JArray itemsArray = jsonObject.items as JArray;
-          return itemsArray.ToObject<List<dynamic>>();
+          UriBuilder uriBuilder = new UriBuilder("https://api.clashofclans.com/v1/clans?");
+          uriBuilder.Query = "locationId=32000094&limit=1000";
+
+          HttpResponseMessage response = await httpClient.GetAsync(uriBuilder.Uri);
+          if (response.IsSuccessStatusCode)
+          {
+            string jsonResponse = await response.Content.ReadAsStringAsync();
+            dynamic jsonObject = JsonConvert.DeserializeObject<dynamic>(jsonResponse);
+            JArray itemsArray = jsonObject.items as JArray;
+            return itemsArray.ToObject<List<dynamic>>();
+          }
         }
+        return null;
       }
-      return null;
+      catch (Exception ex)
+      {
+        return null;
+      }
     }
 
     public async void FindWantedPlayers(dynamic clan)
@@ -91,38 +98,52 @@ namespace COCInviter.Helpers
 
     private async Task<List<dynamic>> GetMembersOfClanAsync(string clanTag)
     {
-      using (HttpClient httpClient = CreateHttpClient())
+      try
       {
-        UriBuilder uriBuilder = new UriBuilder($"https://api.clashofclans.com/v1/clans/%23{clanTag.Replace("#", "")}/members");
-
-        HttpResponseMessage response = await httpClient.GetAsync(uriBuilder.Uri);
-
-        if (response.IsSuccessStatusCode)
+        using (HttpClient httpClient = CreateHttpClient())
         {
-          string jsonResponse = await response.Content.ReadAsStringAsync();
-          dynamic jsonObject = JsonConvert.DeserializeObject<dynamic>(jsonResponse);
-          JArray itemsArray = jsonObject.items as JArray;
-          return itemsArray.ToObject<List<dynamic>>();
+          UriBuilder uriBuilder = new UriBuilder($"https://api.clashofclans.com/v1/clans/%23{clanTag.Replace("#", "")}/members");
+
+          HttpResponseMessage response = await httpClient.GetAsync(uriBuilder.Uri);
+
+          if (response.IsSuccessStatusCode)
+          {
+            string jsonResponse = await response.Content.ReadAsStringAsync();
+            dynamic jsonObject = JsonConvert.DeserializeObject<dynamic>(jsonResponse);
+            JArray itemsArray = jsonObject.items as JArray;
+            return itemsArray.ToObject<List<dynamic>>();
+          }
         }
+        return null;
       }
-      return null;
+      catch (Exception ex)
+      {
+        return null;
+      }
     }
 
     private async Task<dynamic> FetchPlayerDetailsAsync(string playerTag)
     {
-      using (HttpClient httpClient = CreateHttpClient())
+      try
       {
-        UriBuilder uriBuilder = new UriBuilder($"https://api.clashofclans.com/v1/players/%23{playerTag.Replace("#", "")}");
-
-        HttpResponseMessage response = await httpClient.GetAsync(uriBuilder.Uri);
-
-        if (response.IsSuccessStatusCode)
+        using (HttpClient httpClient = CreateHttpClient())
         {
-          string jsonResponse = await response.Content.ReadAsStringAsync();
-          return JsonConvert.DeserializeObject<dynamic>(jsonResponse);
+          UriBuilder uriBuilder = new UriBuilder($"https://api.clashofclans.com/v1/players/%23{playerTag.Replace("#", "")}");
+
+          HttpResponseMessage response = await httpClient.GetAsync(uriBuilder.Uri);
+
+          if (response.IsSuccessStatusCode)
+          {
+            string jsonResponse = await response.Content.ReadAsStringAsync();
+            return JsonConvert.DeserializeObject<dynamic>(jsonResponse);
+          }
         }
+        return null;
       }
-      return null;
+      catch (Exception ex)
+      {
+        return null;
+      }
     }
 
     private bool IsPlayerEligible(dynamic playerDetails)
@@ -216,21 +237,27 @@ namespace COCInviter.Helpers
 
     public async Task<dynamic> FetchClanDetailsAsync(string clanTag)
     {
-      Console.Write("Api test");
-      using (HttpClient httpClient = CreateHttpClient())
+      try
       {
-        UriBuilder uriBuilder = new UriBuilder($"https://api.clashofclans.com/v1/clans/%23{clanTag.Replace("#", "")}");
-        
-        HttpResponseMessage response = await httpClient.GetAsync(uriBuilder.Uri);
-        Console.WriteLine(response.ToString());
-        if (response.IsSuccessStatusCode)
+        using (HttpClient httpClient = CreateHttpClient())
         {
-          string jsonResponse = await response.Content.ReadAsStringAsync();
-          Console.WriteLine(jsonResponse);
-          return JsonConvert.DeserializeObject<dynamic>(jsonResponse);
+          UriBuilder uriBuilder = new UriBuilder($"https://api.clashofclans.com/v1/clans/%23{clanTag.Replace("#", "")}");
+
+          HttpResponseMessage response = await httpClient.GetAsync(uriBuilder.Uri);
+          Console.WriteLine(response.ToString());
+          if (response.IsSuccessStatusCode)
+          {
+            string jsonResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine(jsonResponse);
+            return JsonConvert.DeserializeObject<dynamic>(jsonResponse);
+          }
         }
+        return null;
       }
-      return null;
+      catch (Exception ex)
+      {
+        return null;
+      }
     }
   }
 }

@@ -16,6 +16,7 @@ using System.Security.Cryptography;
 using Discord.WebSocket;
 using Discord;
 using COCInviter.Helpers;
+using System.Diagnostics;
 
 namespace COCInviter
 {
@@ -174,13 +175,16 @@ namespace COCInviter
         SetCursorPos(700, 325);
         mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
         mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
-        Thread.Sleep(250);
+        Thread.Sleep(500);
         for (int i = 0; i < 10; i++)
-          SendKeys.SendWait("{BACKSPACE}");
+        {
+          SendKeys.SendWait("");
+          Thread.Sleep(100);
+        }
         Thread.Sleep(250);
         SendKeys.SendWait(tag);
-        Thread.Sleep(350);
-        SetCursorPos(1200, 325);
+        Thread.Sleep(500);
+        SetCursorPos(1250, 325);
         mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
         mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
         Thread.Sleep(1500);
@@ -188,7 +192,27 @@ namespace COCInviter
         mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
         mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
         Thread.Sleep(300);
-        SetCursorPos(300, 125);
+        SetCursorPos(250, 100);
+        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+        Thread.Sleep(250);
+
+        SetCursorPos(1650, 100);
+        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+        Thread.Sleep(250);
+
+        SetCursorPos(50, 50);
+        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+        Thread.Sleep(250);
+        
+        SetCursorPos(1500, 100);
+        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+        Thread.Sleep(250);
+
+        SetCursorPos(1500, 200);
         mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
         mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
         Thread.Sleep(250);
@@ -207,7 +231,6 @@ namespace COCInviter
         if (!isChecked) return;
       }
     }
-
 
     private void FindPlayersCheckBox_Checked(object sender, RoutedEventArgs e)
     {
